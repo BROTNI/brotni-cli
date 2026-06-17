@@ -1,0 +1,28 @@
+apiVersion: brotni.io/v1
+kind: Context
+metadata:
+  name: my-service-context
+  description: Input and output contract for my-service simulation
+  labels:
+    team: platform
+inputs:
+  - name: database_url
+    type: string
+    description: Connection string for the test database
+    required: true
+  - name: artifact_image
+    type: artifact
+    description: Container image to simulate
+    required: true
+  - name: test_suite
+    type: string
+    description: Test suite to execute
+    required: false
+    default: "all"
+outputs:
+  - name: test_results
+    type: report
+    description: JUnit XML test results
+  - name: coverage_report
+    type: file
+    description: Code coverage HTML report

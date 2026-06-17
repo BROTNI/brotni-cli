@@ -1,0 +1,33 @@
+# Binaries
+/brotni
+/brotni.exe
+dist/
+
+# Build artifacts
+*.o
+*.a
+*.so
+
+# Test artifacts
+*.test
+coverage.out
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# Config
+.brotni.yaml
+.brotni.yml
+*.local.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

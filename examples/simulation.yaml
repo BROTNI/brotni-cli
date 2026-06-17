@@ -1,0 +1,16 @@
+apiVersion: brotni.io/v1
+kind: Simulation
+metadata:
+  name: my-service-integration
+  description: Full integration simulation for my-service
+  labels:
+    team: platform
+    trigger: pull_request
+spec:
+  recipeRef: my-service-recipe
+  contextRef: my-service-context
+  timeout: 30m
+  retries: 1
+  parameters:
+    test_suite: integration
+    log_level: info
