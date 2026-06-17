@@ -1,0 +1,18 @@
+apiVersion: brotni.io/v1
+kind: Recipe
+metadata:
+  name: my-service-recipe
+  description: Runtime recipe for my-service integration tests
+  labels:
+    team: platform
+    env: ci
+runtime:
+  image: my-registry.example.com/my-service:latest
+  command: ["./run-tests.sh"]
+  env:
+    LOG_LEVEL: "info"
+    TEST_MODE: "integration"
+  resources:
+    cpu: "1"
+    memory: "1Gi"
+  workingDir: /app

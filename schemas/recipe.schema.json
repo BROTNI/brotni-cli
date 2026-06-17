@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schemas.brotni.io/v1/recipe",
+  "title": "Recipe",
+  "description": "A Brotni runtime execution recipe that defines the container image and execution environment.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "runtime"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "description": "Schema version, e.g. brotni.io/v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "Recipe",
+      "description": "Must be 'Recipe'"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["image"],
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Container image URI"
+        },
+        "command": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Override the container entrypoint"
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Environment variables"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "string", "description": "CPU request, e.g. '500m' or '2'" },
+            "memory": { "type": "string", "description": "Memory request, e.g. '512Mi' or '2Gi'" }
+          }
+        },
+        "workingDir": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}
