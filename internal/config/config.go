@@ -20,8 +20,12 @@ func Load(cfgFile string) (*Config, error) {
 
 	v.SetEnvPrefix("BROTNI")
 	v.AutomaticEnv()
-	v.BindEnv("api_url", "BROTNI_API_URL")
-	v.BindEnv("token", "BROTNI_TOKEN")
+	if err := v.BindEnv("api_url", "BROTNI_API_URL"); err != nil {
+		return nil, fmt.Errorf("binding api_url env: %w", err)
+	}
+	if err := v.BindEnv("token", "BROTNI_TOKEN"); err != nil {
+		return nil, fmt.Errorf("binding token env: %w", err)
+	}
 
 	v.SetDefault("api_url", "https://api.brotni.io")
 	v.SetDefault("output", "table")
