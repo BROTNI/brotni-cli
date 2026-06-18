@@ -136,7 +136,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, out i
 	if err != nil {
 		return fmt.Errorf("API request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		var apiErr struct {

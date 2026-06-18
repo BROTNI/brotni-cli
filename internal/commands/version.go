@@ -43,11 +43,12 @@ var versionCmd = &cobra.Command{
 			return enc.Encode(info)
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "brotni-cli %s\n", info.Version)
-		fmt.Fprintf(cmd.OutOrStdout(), "  commit:     %s\n", info.Commit)
-		fmt.Fprintf(cmd.OutOrStdout(), "  built:      %s\n", info.BuildDate)
-		fmt.Fprintf(cmd.OutOrStdout(), "  go version: %s\n", info.GoVersion)
-		fmt.Fprintf(cmd.OutOrStdout(), "  platform:   %s/%s\n", info.OS, info.Arch)
+		out := cmd.OutOrStdout()
+		_, _ = fmt.Fprintf(out, "brotni-cli %s\n", info.Version)
+		_, _ = fmt.Fprintf(out, "  commit:     %s\n", info.Commit)
+		_, _ = fmt.Fprintf(out, "  built:      %s\n", info.BuildDate)
+		_, _ = fmt.Fprintf(out, "  go version: %s\n", info.GoVersion)
+		_, _ = fmt.Fprintf(out, "  platform:   %s/%s\n", info.OS, info.Arch)
 		return nil
 	},
 }

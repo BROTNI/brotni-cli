@@ -43,35 +43,35 @@ func (p *Printer) PrintTable(headers []string, rows [][]string) {
 
 	for i, h := range headers {
 		if i > 0 {
-			fmt.Fprint(w, "\t")
+			_, _ = fmt.Fprint(w, "\t")
 		}
-		fmt.Fprint(w, h)
+		_, _ = fmt.Fprint(w, h)
 	}
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w)
 
 	for _, row := range rows {
 		for i, cell := range row {
 			if i > 0 {
-				fmt.Fprint(w, "\t")
+				_, _ = fmt.Fprint(w, "\t")
 			}
-			fmt.Fprint(w, cell)
+			_, _ = fmt.Fprint(w, cell)
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 }
 
 func (p *Printer) Successf(format string, args ...interface{}) {
-	fmt.Fprintf(p.out, format+"\n", args...)
+	_, _ = fmt.Fprintf(p.out, format+"\n", args...)
 }
 
 func PrintError(err error) {
-	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 }
 
 func PrintDebug(enabled bool, format string, args ...interface{}) {
 	if enabled {
-		fmt.Fprintf(os.Stderr, "[debug] "+format+"\n", args...)
+		_, _ = fmt.Fprintf(os.Stderr, "[debug] "+format+"\n", args...)
 	}
 }
