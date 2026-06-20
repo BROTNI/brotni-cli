@@ -64,9 +64,28 @@ type CampaignDiscovery struct {
 }
 
 type CampaignCandidate struct {
-	Name       string `yaml:"name"`
-	SourceKind string `yaml:"sourceKind"`
-	RecipeRef  string `yaml:"recipeRef,omitempty"`
+	Name       string                   `yaml:"name"`
+	SourceKind string                   `yaml:"sourceKind"`
+	RecipeRef  string                   `yaml:"recipeRef,omitempty"`
+	Source     *CampaignCandidateSource `yaml:"source,omitempty"`
+	Artifact   *CampaignCandidateArtifact `yaml:"artifact,omitempty"`
+}
+
+type CampaignCandidateSource struct {
+	Provider          string `yaml:"provider,omitempty"`
+	Repository        string `yaml:"repository,omitempty"`
+	ChangeRequestType string `yaml:"changeRequestType,omitempty"`
+	ChangeRequestID   string `yaml:"changeRequestId,omitempty"`
+	Branch            string `yaml:"branch,omitempty"`
+	HeadSha           string `yaml:"headSha,omitempty"`
+	BaseSha           string `yaml:"baseSha,omitempty"`
+	URL               string `yaml:"url,omitempty"`
+}
+
+type CampaignCandidateArtifact struct {
+	Kind   string `yaml:"kind,omitempty"`
+	URI    string `yaml:"uri,omitempty"`
+	Digest string `yaml:"digest,omitempty"`
 }
 
 var validDirections = map[string]bool{"minimize": true, "maximize": true}

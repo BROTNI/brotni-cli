@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/BROTNI/brotni-cli/internal/api"
 	"github.com/BROTNI/brotni-cli/internal/output"
@@ -51,19 +53,42 @@ var campaignCreateCmd = &cobra.Command{
 		}
 
 		client := api.NewClient(cfg.APIURL, cfg.Token, cfg.Debug)
-		resp, err := client.CreateCampaign(context.Background(), req)
+		ctx := context.Background()
+		resp, err := client.CreateCampaign(ctx, req)
 		if err != nil {
 			return fmt.Errorf("creating campaign: %w", err)
 		}
 
+		// Register the explicit candidates declared in the manifest. `create`
+		// owns explicit candidate registration; dynamic discovery (label /
+		// linked PRs) is handled separately by the CI integrations.
+		type registered struct {
+			Name        string `json:"name"`
+			CandidateID string `json:"candidateId"`
+		}
+		var regs []registered
+		for _, c := range manifest.Candidates.List {
+			cr, err := client.AddCandidate(ctx, resp.ID, manifestCandidateToRequest(c))
+			if err != nil {
+				return fmt.Errorf("registering candidate %q: %w", c.Name, err)
+			}
+			regs = append(regs, registered{Name: c.Name, CandidateID: cr.ID})
+		}
+
 		if cfg.Output == "json" {
-			return printer.PrintJSON(resp)
+			return printer.PrintJSON(map[string]any{"campaign": resp, "candidates": regs})
 		}
 		fmt.Println("Campaign created")
 		fmt.Printf("  ID:              %s\n", resp.ID)
 		fmt.Printf("  Title:           %s\n", resp.Title)
 		fmt.Printf("  Status:          %s\n", resp.Status)
 		fmt.Printf("  Scoring version: %d\n", resp.ActiveScoringVersion)
+		if len(regs) > 0 {
+			fmt.Printf("  Registered %d candidate(s):\n", len(regs))
+			for _, r := range regs {
+				fmt.Printf("    %-22s %s\n", r.Name, r.CandidateID)
+			}
+		}
 		return nil
 	},
 }
@@ -90,12 +115,20 @@ CI/CD integration (brotni-github-action, brotni-gitlab-component).`,
 		for _, c := range candidates {
 			fmt.Printf("  - %s (%s)\n", c.Name, c.SourceKind)
 		}
-		// NOTE: client-side candidate registration is not yet wired. Registering
-		// these candidates with the studio (and label-based discovery of linked
-		// PRs/MRs) is the next integration step. This command currently only
-		// resolves and lists the manifest-declared candidates.
-		fmt.Println("\nNote: candidate registration with the studio is not yet wired; " +
-			"this command lists the manifest candidates only.")
+		// Explicit candidates from candidates.list are registered by
+		// `campaign create`. This command surfaces dynamic discovery (label /
+		// linked PRs), which is driven by the CI integrations and not yet wired
+		// for direct studio registration here.
+		mode := ""
+		if manifest.Candidates.Discovery != nil {
+			mode = manifest.Candidates.Discovery.Mode
+		}
+		if mode != "" && mode != "manifest" {
+			fmt.Printf("\nDynamic discovery mode %q is handled by the CI integrations "+
+				"(brotni-github-action / brotni-gitlab-component) and is not registered here.\n", mode)
+		} else {
+			fmt.Println("\nNote: explicit candidates are registered by `brotni campaign create`.")
+		}
 		return nil
 	},
 }
@@ -190,10 +223,49 @@ var campaignDecisionCmd = &cobra.Command{
 	},
 }
 
+var (
+	ingestCandidateID string
+	ingestMetrics     string
+)
+
+var campaignIngestCmd = &cobra.Command{
+	Use:   "ingest",
+	Short: "Ingest run metrics for a candidate",
+	Long: `Record a candidate's run metrics so they can be scored and compared.
+
+This is a demo/test affordance: in production, metrics are produced by
+simulation runs against the context, not hand-fed via the CLI.`,
+	Example: `  brotni campaign ingest --id camp-123 --candidate cand-456 \
+    --metrics p99_latency_ms=100,throughput_rps=2000,error_rate=0.1`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if campaignID == "" {
+			return fmt.Errorf("--id is required")
+		}
+		if ingestCandidateID == "" {
+			return fmt.Errorf("--candidate is required")
+		}
+		metrics, err := parseMetrics(ingestMetrics)
+		if err != nil {
+			return err
+		}
+		if cfg.DryRun {
+			fmt.Printf("[dry-run] would ingest %d metric(s) for candidate %s\n", len(metrics), ingestCandidateID)
+			return nil
+		}
+		client := api.NewClient(cfg.APIURL, cfg.Token, cfg.Debug)
+		if err := client.IngestMetrics(context.Background(), campaignID, ingestCandidateID, metrics); err != nil {
+			return fmt.Errorf("ingesting metrics: %w", err)
+		}
+		fmt.Printf("Ingested %d metric(s) for candidate %s\n", len(metrics), ingestCandidateID)
+		return nil
+	},
+}
+
 func init() {
 	campaignCmd.AddCommand(campaignCreateCmd)
 	campaignCmd.AddCommand(campaignDiscoverCmd)
 	campaignCmd.AddCommand(campaignStatusCmd)
+	campaignCmd.AddCommand(campaignIngestCmd)
 	campaignCmd.AddCommand(campaignCompareCmd)
 	campaignCmd.AddCommand(campaignDecisionCmd)
 
@@ -201,6 +273,10 @@ func init() {
 
 	campaignDiscoverCmd.Flags().StringVar(&campaignID, "id", "", "campaign ID (required)")
 	campaignDiscoverCmd.Flags().StringVar(&campaignManifest, "manifest", "", "path to campaign manifest (required)")
+
+	campaignIngestCmd.Flags().StringVar(&campaignID, "id", "", "campaign ID (required)")
+	campaignIngestCmd.Flags().StringVar(&ingestCandidateID, "candidate", "", "candidate ID (required)")
+	campaignIngestCmd.Flags().StringVar(&ingestMetrics, "metrics", "", "comma-separated metric=value pairs (required)")
 
 	campaignStatusCmd.Flags().StringVar(&campaignID, "id", "", "campaign ID (required)")
 
@@ -253,6 +329,55 @@ func manifestToCreateRequest(m *validate.CampaignManifest) api.CampaignCreateReq
 		})
 	}
 	return req
+}
+
+func manifestCandidateToRequest(c validate.CampaignCandidate) api.ChangeCandidateRequest {
+	req := api.ChangeCandidateRequest{
+		Name:          c.Name,
+		SourceKind:    c.SourceKind,
+		RecipeRef:     c.RecipeRef,
+		DiscoveredVia: "manifest",
+	}
+	if s := c.Source; s != nil {
+		req.SourceRef = api.SourceRef{
+			Provider:          s.Provider,
+			Repository:        s.Repository,
+			ChangeRequestType: s.ChangeRequestType,
+			ChangeRequestID:   s.ChangeRequestID,
+			Branch:            s.Branch,
+			HeadSHA:           s.HeadSha,
+			BaseSHA:           s.BaseSha,
+			URL:               s.URL,
+		}
+	}
+	if a := c.Artifact; a != nil {
+		req.ArtifactRef = &api.ArtifactRef{Kind: a.Kind, URI: a.URI, Digest: a.Digest}
+	}
+	return req
+}
+
+// parseMetrics parses "k1=v1,k2=v2" into a metric map.
+func parseMetrics(s string) (map[string]float64, error) {
+	out := map[string]float64{}
+	if strings.TrimSpace(s) == "" {
+		return nil, fmt.Errorf("--metrics is required (e.g. p99_latency_ms=100,error_rate=0.1)")
+	}
+	for _, pair := range strings.Split(s, ",") {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+		kv := strings.SplitN(pair, "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("invalid metric %q, expected name=value", pair)
+		}
+		v, err := strconv.ParseFloat(strings.TrimSpace(kv[1]), 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid value for metric %q: %w", strings.TrimSpace(kv[0]), err)
+		}
+		out[strings.TrimSpace(kv[0])] = v
+	}
+	return out, nil
 }
 
 func renderDecisionMarkdown(r *api.DecisionReport) string {

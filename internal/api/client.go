@@ -116,6 +116,40 @@ type CampaignResponse struct {
 	ActiveScoringVersion int    `json:"activeScoringVersion"`
 }
 
+type SourceRef struct {
+	Provider          string `json:"provider,omitempty"`
+	Repository        string `json:"repository,omitempty"`
+	ChangeRequestType string `json:"changeRequestType,omitempty"`
+	ChangeRequestID   string `json:"changeRequestId,omitempty"`
+	Branch            string `json:"branch,omitempty"`
+	HeadSHA           string `json:"headSha,omitempty"`
+	BaseSHA           string `json:"baseSha,omitempty"`
+	URL               string `json:"url,omitempty"`
+}
+
+type ArtifactRef struct {
+	Kind   string `json:"kind,omitempty"`
+	URI    string `json:"uri,omitempty"`
+	Digest string `json:"digest,omitempty"`
+}
+
+type ChangeCandidateRequest struct {
+	Name          string       `json:"name"`
+	SourceKind    string       `json:"sourceKind"`
+	SourceRef     SourceRef    `json:"sourceRef"`
+	ArtifactRef   *ArtifactRef `json:"artifactRef,omitempty"`
+	RecipeRef     string       `json:"recipeRef,omitempty"`
+	DiscoveredVia string       `json:"discoveredVia,omitempty"`
+}
+
+type ChangeCandidateResponse struct {
+	ID         string `json:"id"`
+	CampaignID string `json:"campaignId"`
+	Name       string `json:"name"`
+	SourceKind string `json:"sourceKind"`
+	Status     string `json:"status"`
+}
+
 type Ranking struct {
 	Rank           int     `json:"rank"`
 	CandidateID    string  `json:"candidateId"`
@@ -142,10 +176,14 @@ type ScorecardListResponse struct {
 	Items []Scorecard `json:"items"`
 }
 
+// campaignBase is the public API path prefix for the campaign surface. The
+// simulation-engine serves these routes directly, acting as the studio.
+const campaignBase = "/api/v1/campaigns"
+
 // CreateCampaign creates a simulation campaign from a parsed manifest.
 func (c *Client) CreateCampaign(ctx context.Context, req CampaignCreateRequest) (*CampaignResponse, error) {
 	var resp CampaignResponse
-	if err := c.doRequest(ctx, http.MethodPost, "/v1/campaigns", req, &resp); err != nil {
+	if err := c.doRequest(ctx, http.MethodPost, campaignBase, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -154,16 +192,34 @@ func (c *Client) CreateCampaign(ctx context.Context, req CampaignCreateRequest) 
 // GetCampaign fetches a campaign by ID.
 func (c *Client) GetCampaign(ctx context.Context, id string) (*CampaignResponse, error) {
 	var resp CampaignResponse
-	if err := c.doRequest(ctx, http.MethodGet, "/v1/campaigns/"+id, nil, &resp); err != nil {
+	if err := c.doRequest(ctx, http.MethodGet, campaignBase+"/"+id, nil, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
+// AddCandidate registers a change candidate with a campaign and returns the
+// studio-minted candidate ID.
+func (c *Client) AddCandidate(ctx context.Context, campaignID string, req ChangeCandidateRequest) (*ChangeCandidateResponse, error) {
+	var resp ChangeCandidateResponse
+	path := fmt.Sprintf("%s/%s/candidates", campaignBase, campaignID)
+	if err := c.doRequest(ctx, http.MethodPost, path, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// IngestMetrics records a candidate's run metrics for a campaign.
+func (c *Client) IngestMetrics(ctx context.Context, campaignID, candidateID string, metrics map[string]float64) error {
+	path := fmt.Sprintf("%s/%s/runs/%s/metrics", campaignBase, campaignID, candidateID)
+	body := map[string]any{"metrics": metrics}
+	return c.doRequest(ctx, http.MethodPost, path, body, nil)
+}
+
 // GetScorecards returns the per-candidate scorecards for a campaign. A
 // scoringVersion of 0 means the campaign's active version.
 func (c *Client) GetScorecards(ctx context.Context, campaignID string, scoringVersion int) (*ScorecardListResponse, error) {
-	path := fmt.Sprintf("/v1/campaigns/%s/scorecards", campaignID)
+	path := fmt.Sprintf("%s/%s/scorecards", campaignBase, campaignID)
 	if scoringVersion > 0 {
 		path = fmt.Sprintf("%s?scoringVersion=%d", path, scoringVersion)
 	}
@@ -176,7 +232,7 @@ func (c *Client) GetScorecards(ctx context.Context, campaignID string, scoringVe
 
 // GetDecision returns the decision report for a campaign.
 func (c *Client) GetDecision(ctx context.Context, campaignID string, scoringVersion int) (*DecisionReport, error) {
-	path := fmt.Sprintf("/v1/campaigns/%s/decision", campaignID)
+	path := fmt.Sprintf("%s/%s/decision", campaignBase, campaignID)
 	if scoringVersion > 0 {
 		path = fmt.Sprintf("%s?scoringVersion=%d", path, scoringVersion)
 	}

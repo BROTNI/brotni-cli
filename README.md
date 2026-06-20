@@ -205,13 +205,22 @@ constraints:
 # Validate the manifest (non-zero exit on failure — CI-friendly)
 brotni validate campaign .brotni/simulation.yaml
 
-# Create the campaign
+# Create the campaign and register the manifest's candidates.
+# The output prints each candidate's name -> studio-minted ID.
 brotni campaign create --manifest .brotni/simulation.yaml
+
+# Ingest run metrics per candidate (demo/test affordance — in production
+# metrics come from simulation runs against the context, not the CLI):
+brotni campaign ingest --id camp-123 --candidate cand-456 \
+  --metrics p99_latency_ms=120,cost_per_1k_requests=8,resilience_score=70
 
 # Compare candidate scorecards and read the decision
 brotni campaign compare  --id camp-123
 brotni campaign decision --id camp-123 --format md
 ```
+
+The CLI talks to the campaign API at `/api/v1/campaigns`; point `BROTNI_API_URL`
+at a running studio (the simulation-engine serves this surface directly).
 
 Scoring is **comparative** (each goal min-max normalised across candidates) and
 **versioned** — re-weighting goals creates a new scoring version without
