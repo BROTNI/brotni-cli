@@ -1,0 +1,75 @@
+# Brotni Simulation Campaign manifest (.brotni/simulation.yaml)
+#
+# Declares a campaign that compares multiple change candidates under one work
+# item, on the same goals and constraints. Validate with:
+#   brotni validate campaign examples/campaign/simulation.yaml
+# Create with:
+#   brotni campaign create --manifest examples/campaign/simulation.yaml
+version: 1
+
+campaign:
+  title: "Optimize routing strategy for high-volume traffic"
+  description: "Compare candidate routing policies on replayed production traffic."
+  linkedWorkItem:
+    provider: github
+    type: issue
+    repo: brotni/brotni-api
+    number: 482
+
+simulation:
+  environment: routing-sim-v3
+  dataset: prod-replay-2026-05
+
+constraints:
+  - name: p99_latency
+    metric: p99_latency_ms
+    operator: "<"
+    threshold: 250
+    severity: blocking
+  - name: error_rate
+    metric: error_rate
+    operator: "<"
+    threshold: 0.2
+    severity: blocking
+
+goals:
+  - name: cost
+    metric: cost_per_1k_requests
+    weight: 0.25
+    direction: minimize
+  - name: latency
+    metric: p99_latency_ms
+    weight: 0.30
+    direction: minimize
+  - name: resilience
+    metric: resilience_score
+    weight: 0.30
+    direction: maximize
+  - name: customer_impact
+    metric: customer_impact_score
+    weight: 0.15
+    direction: minimize
+
+candidates:
+  discovery:
+    mode: linked_pull_requests
+    label: brotni-simulation-candidate
+    workItem: 482
+  list:
+    - name: routing-policy-a
+      sourceKind: container_image
+      recipeRef: .brotni/runtime.yaml
+      artifact:
+        kind: oci-image
+        uri: ghcr.io/brotni/routing-service
+        digest: sha256:aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000aaaa0000
+    - name: routing-policy-b
+      sourceKind: container_image
+      recipeRef: .brotni/runtime.yaml
+      artifact:
+        kind: oci-image
+        uri: ghcr.io/brotni/routing-service
+        digest: sha256:bbbb1111bbbb1111bbbb1111bbbb1111bbbb1111bbbb1111bbbb1111bbbb1111
+    - name: routing-config-v7
+      sourceKind: config_bundle
+      recipeRef: .brotni/config-bundle.yaml

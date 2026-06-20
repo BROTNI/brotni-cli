@@ -45,10 +45,20 @@ var validateSimulationCmd = &cobra.Command{
 	},
 }
 
+var validateCampaignCmd = &cobra.Command{
+	Use:   "campaign <file>",
+	Short: "Validate a campaign manifest (.brotni/simulation.yaml)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runValidate(args[0], validate.ValidateCampaign)
+	},
+}
+
 func init() {
 	validateCmd.AddCommand(validateRecipeCmd)
 	validateCmd.AddCommand(validateContextCmd)
 	validateCmd.AddCommand(validateSimulationCmd)
+	validateCmd.AddCommand(validateCampaignCmd)
 }
 
 func runValidate(file string, validateFn func(string) (*validate.ValidationResult, error)) error {

@@ -39,6 +39,8 @@ type CandidateSubmitRequest struct {
 	SimulationSpec string `json:"simulation_spec,omitempty"`
 	RecipeSpec     string `json:"recipe_spec,omitempty"`
 	ContextSpec    string `json:"context_spec,omitempty"`
+	CampaignID     string `json:"campaign_id,omitempty"`
+	SourceKind     string `json:"source_kind,omitempty"`
 }
 
 type CandidateSubmitResponse struct {
@@ -71,6 +73,118 @@ type ReportExportResponse struct {
 	Format  string `json:"format"`
 	Content string `json:"content,omitempty"`
 	URL     string `json:"url,omitempty"`
+}
+
+// --- Simulation Campaign -----------------------------------------------------
+
+type WorkItem struct {
+	Provider string `json:"provider"`
+	Type     string `json:"type"`
+	Repo     string `json:"repo,omitempty"`
+	Number   int    `json:"number,omitempty"`
+	URL      string `json:"url,omitempty"`
+}
+
+type Goal struct {
+	Name      string  `json:"name"`
+	Metric    string  `json:"metric"`
+	Weight    float64 `json:"weight"`
+	Direction string  `json:"direction"`
+}
+
+type Constraint struct {
+	Name      string  `json:"name"`
+	Metric    string  `json:"metric"`
+	Operator  string  `json:"operator"`
+	Threshold float64 `json:"threshold"`
+	Severity  string  `json:"severity,omitempty"`
+}
+
+type CampaignCreateRequest struct {
+	Title       string       `json:"title"`
+	WorkItem    *WorkItem    `json:"workItem,omitempty"`
+	Environment string       `json:"environment,omitempty"`
+	Dataset     string       `json:"dataset,omitempty"`
+	Goals       []Goal       `json:"goals,omitempty"`
+	Constraints []Constraint `json:"constraints,omitempty"`
+}
+
+type CampaignResponse struct {
+	ID                   string `json:"id"`
+	Title                string `json:"title"`
+	Status               string `json:"status"`
+	ActiveScoringVersion int    `json:"activeScoringVersion"`
+}
+
+type Ranking struct {
+	Rank           int     `json:"rank"`
+	CandidateID    string  `json:"candidateId"`
+	OverallScore   float64 `json:"overallScore"`
+	PassedBlocking bool    `json:"passedBlocking"`
+}
+
+type DecisionReport struct {
+	CampaignID        string    `json:"campaignId"`
+	ScoringVersion    int       `json:"scoringVersion"`
+	WinnerCandidateID string    `json:"winnerCandidateId,omitempty"`
+	Ranking           []Ranking `json:"ranking"`
+	Rationale         string    `json:"rationale"`
+}
+
+type Scorecard struct {
+	CandidateID    string  `json:"candidateId"`
+	ScoringVersion int     `json:"scoringVersion"`
+	OverallScore   float64 `json:"overallScore"`
+	PassedBlocking bool    `json:"passedBlocking"`
+}
+
+type ScorecardListResponse struct {
+	Items []Scorecard `json:"items"`
+}
+
+// CreateCampaign creates a simulation campaign from a parsed manifest.
+func (c *Client) CreateCampaign(ctx context.Context, req CampaignCreateRequest) (*CampaignResponse, error) {
+	var resp CampaignResponse
+	if err := c.doRequest(ctx, http.MethodPost, "/v1/campaigns", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetCampaign fetches a campaign by ID.
+func (c *Client) GetCampaign(ctx context.Context, id string) (*CampaignResponse, error) {
+	var resp CampaignResponse
+	if err := c.doRequest(ctx, http.MethodGet, "/v1/campaigns/"+id, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetScorecards returns the per-candidate scorecards for a campaign. A
+// scoringVersion of 0 means the campaign's active version.
+func (c *Client) GetScorecards(ctx context.Context, campaignID string, scoringVersion int) (*ScorecardListResponse, error) {
+	path := fmt.Sprintf("/v1/campaigns/%s/scorecards", campaignID)
+	if scoringVersion > 0 {
+		path = fmt.Sprintf("%s?scoringVersion=%d", path, scoringVersion)
+	}
+	var resp ScorecardListResponse
+	if err := c.doRequest(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetDecision returns the decision report for a campaign.
+func (c *Client) GetDecision(ctx context.Context, campaignID string, scoringVersion int) (*DecisionReport, error) {
+	path := fmt.Sprintf("/v1/campaigns/%s/decision", campaignID)
+	if scoringVersion > 0 {
+		path = fmt.Sprintf("%s?scoringVersion=%d", path, scoringVersion)
+	}
+	var resp DecisionReport
+	if err := c.doRequest(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 // SubmitCandidate submits a simulation candidate to the Brotni platform.

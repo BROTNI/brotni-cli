@@ -51,6 +51,7 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(candidateCmd)
+	rootCmd.AddCommand(campaignCmd)
 	rootCmd.AddCommand(simulationCmd)
 	rootCmd.AddCommand(reportCmd)
 }

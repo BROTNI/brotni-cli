@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schemas.brotni.io/v1/campaign",
+  "title": "Simulation Campaign",
+  "description": "The portable .brotni/simulation.yaml manifest. Declares a campaign that groups multiple change candidates under one work item and the goals/constraints used to compare them. Consumed by brotni-cli and submitted to a Brotni-compatible studio.",
+  "type": "object",
+  "required": ["version", "campaign", "goals"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Manifest schema version.",
+      "enum": [1]
+    },
+    "campaign": {
+      "type": "object",
+      "required": ["title"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "linkedWorkItem": {
+          "type": "object",
+          "required": ["provider", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "provider": { "type": "string", "enum": ["github", "gitlab", "jira", "linear", "generic"] },
+            "type": { "type": "string", "enum": ["issue", "merge_request", "pull_request", "ticket", "change_request"] },
+            "repo": { "type": "string" },
+            "number": { "type": "integer" },
+            "url": { "type": "string", "format": "uri" }
+          }
+        }
+      }
+    },
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environment": { "type": "string" },
+        "dataset": { "type": "string" }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "metric", "operator", "threshold"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "metric": { "type": "string" },
+          "operator": { "type": "string", "enum": ["<", "<=", ">", ">=", "=="] },
+          "threshold": { "type": "number" },
+          "severity": { "type": "string", "enum": ["blocking", "warning"], "default": "blocking" }
+        }
+      }
+    },
+    "goals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "metric", "weight", "direction"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "metric": { "type": "string" },
+          "weight": { "type": "number", "exclusiveMinimum": 0 },
+          "direction": { "type": "string", "enum": ["minimize", "maximize"] }
+        }
+      }
+    },
+    "candidates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "discovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["manifest", "linked_pull_requests", "label"] },
+            "label": { "type": "string" },
+            "workItem": { "type": ["integer", "string"] }
+          }
+        },
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "sourceKind"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "sourceKind": { "type": "string", "enum": ["git_change", "container_image", "config_bundle"] },
+              "recipeRef": { "type": "string" },
+              "source": {
+                "type": "object",
+                "properties": {
+                  "provider": { "type": "string" },
+                  "repository": { "type": "string" },
+                  "changeRequestType": { "type": "string" },
+                  "changeRequestId": { "type": "string" },
+                  "branch": { "type": "string" },
+                  "headSha": { "type": "string" },
+                  "baseSha": { "type": "string" },
+                  "url": { "type": "string" }
+                }
+              },
+              "artifact": {
+                "type": "object",
+                "properties": {
+                  "kind": { "type": "string" },
+                  "uri": { "type": "string" },
+                  "digest": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -26,6 +26,8 @@ var (
 	candidateSimulation     string
 	candidateRecipe         string
 	candidateContext        string
+	candidateCampaign       string
+	candidateSourceKind     string
 )
 
 var candidateSubmitCmd = &cobra.Command{
@@ -76,6 +78,12 @@ Supported providers: github, gitlab, bitbucket (and any custom provider).`,
 			if candidatePRMRID != "" {
 				fmt.Printf("  pr/mr id:        %s\n", candidatePRMRID)
 			}
+			if candidateCampaign != "" {
+				fmt.Printf("  campaign:        %s\n", candidateCampaign)
+			}
+			if candidateSourceKind != "" {
+				fmt.Printf("  source kind:     %s\n", candidateSourceKind)
+			}
 			fmt.Printf("  artifact type:   %s\n", candidateArtifactType)
 			fmt.Printf("  artifact uri:    %s\n", candidateArtifactURI)
 			if candidateArtifactDigest != "" {
@@ -107,6 +115,8 @@ Supported providers: github, gitlab, bitbucket (and any custom provider).`,
 			SimulationSpec: candidateSimulation,
 			RecipeSpec:     candidateRecipe,
 			ContextSpec:    candidateContext,
+			CampaignID:     candidateCampaign,
+			SourceKind:     candidateSourceKind,
 		})
 		if err != nil {
 			return fmt.Errorf("submitting candidate: %w", err)
@@ -142,4 +152,6 @@ func init() {
 	f.StringVar(&candidateSimulation, "simulation", "", "path to simulation spec file")
 	f.StringVar(&candidateRecipe, "recipe", "", "path to execution recipe file")
 	f.StringVar(&candidateContext, "context", "", "path to context definition file")
+	f.StringVar(&candidateCampaign, "campaign", "", "campaign ID to associate this candidate with")
+	f.StringVar(&candidateSourceKind, "source-kind", "", "candidate source kind: git_change, container_image, config_bundle")
 }

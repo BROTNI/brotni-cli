@@ -183,6 +183,42 @@ brotni candidate submit \
 | `--recipe`         | Path to execution recipe file                    | no       |
 | `--context`        | Path to context definition file                  | no       |
 
+## Simulation campaigns
+
+A **campaign** groups multiple change candidates (pull requests, OCI images,
+config bundles) under one work item and compares them on the same goals and
+constraints. Declare it in `.brotni/simulation.yaml`:
+
+```yaml
+version: 1
+campaign:
+  title: "Optimize routing strategy"
+  linkedWorkItem: { provider: github, type: issue, number: 482 }
+goals:
+  - { name: latency, metric: p99_latency_ms, weight: 0.5, direction: minimize }
+  - { name: throughput, metric: throughput_rps, weight: 0.5, direction: maximize }
+constraints:
+  - { name: error_rate, metric: error_rate, operator: "<", threshold: 0.2, severity: blocking }
+```
+
+```bash
+# Validate the manifest (non-zero exit on failure — CI-friendly)
+brotni validate campaign .brotni/simulation.yaml
+
+# Create the campaign
+brotni campaign create --manifest .brotni/simulation.yaml
+
+# Compare candidate scorecards and read the decision
+brotni campaign compare  --id camp-123
+brotni campaign decision --id camp-123 --format md
+```
+
+Scoring is **comparative** (each goal min-max normalised across candidates) and
+**versioned** — re-weighting goals creates a new scoring version without
+overwriting prior scorecards. Pass `--scoring-version N` to `compare`/`decision`
+to inspect a specific interpretation. See the full example in
+[`examples/campaign/`](./examples/campaign/).
+
 ## Triggering and monitoring simulations
 
 ```bash
