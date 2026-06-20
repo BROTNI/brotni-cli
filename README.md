@@ -209,8 +209,14 @@ brotni validate campaign .brotni/simulation.yaml
 # The output prints each candidate's name -> studio-minted ID.
 brotni campaign create --manifest .brotni/simulation.yaml
 
-# Ingest run metrics per candidate (demo/test affordance — in production
-# metrics come from simulation runs against the context, not the CLI):
+# Execute candidates and auto-collect the metrics they emit. Requires the
+# studio's command runner (BROTNI_ENABLE_COMMAND_RUNNER=1) and candidates
+# registered with a --command that writes JSON to $BROTNI_METRICS_PATH:
+brotni campaign add-candidate --id camp-123 --name fast \
+  --command 'printf "{\"p99_latency_ms\":120}" > "$BROTNI_METRICS_PATH"'
+brotni campaign run --id camp-123
+
+# Or hand-feed metrics directly (demo/test affordance):
 brotni campaign ingest --id camp-123 --candidate cand-456 \
   --metrics p99_latency_ms=120,cost_per_1k_requests=8,resilience_score=70
 

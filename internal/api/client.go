@@ -133,13 +133,35 @@ type ArtifactRef struct {
 	Digest string `json:"digest,omitempty"`
 }
 
+type ExecutionSpec struct {
+	Command        []string          `json:"command"`
+	Env            map[string]string `json:"env,omitempty"`
+	MetricsPath    string            `json:"metricsPath,omitempty"`
+	TimeoutSeconds int               `json:"timeoutSeconds,omitempty"`
+}
+
 type ChangeCandidateRequest struct {
-	Name          string       `json:"name"`
-	SourceKind    string       `json:"sourceKind"`
-	SourceRef     SourceRef    `json:"sourceRef"`
-	ArtifactRef   *ArtifactRef `json:"artifactRef,omitempty"`
-	RecipeRef     string       `json:"recipeRef,omitempty"`
-	DiscoveredVia string       `json:"discoveredVia,omitempty"`
+	Name          string         `json:"name"`
+	SourceKind    string         `json:"sourceKind"`
+	SourceRef     SourceRef      `json:"sourceRef"`
+	ArtifactRef   *ArtifactRef   `json:"artifactRef,omitempty"`
+	RecipeRef     string         `json:"recipeRef,omitempty"`
+	DiscoveredVia string         `json:"discoveredVia,omitempty"`
+	Execution     *ExecutionSpec `json:"execution,omitempty"`
+}
+
+type RunOutcome struct {
+	CandidateID   string `json:"candidateId"`
+	CandidateName string `json:"candidateName"`
+	Status        string `json:"status"`
+	MetricCount   int    `json:"metricCount"`
+	Error         string `json:"error,omitempty"`
+}
+
+type RunReport struct {
+	CampaignID string         `json:"campaignId"`
+	Runs       []RunOutcome   `json:"runs"`
+	Decision   DecisionReport `json:"decision"`
 }
 
 type ChangeCandidateResponse struct {
@@ -225,6 +247,17 @@ func (c *Client) GetScorecards(ctx context.Context, campaignID string, scoringVe
 	}
 	var resp ScorecardListResponse
 	if err := c.doRequest(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// RunCampaign triggers execution of the campaign's candidates (those with an
+// execution spec) and returns the run outcomes plus the resulting decision.
+func (c *Client) RunCampaign(ctx context.Context, campaignID string) (*RunReport, error) {
+	var resp RunReport
+	path := fmt.Sprintf("%s/%s/run", campaignBase, campaignID)
+	if err := c.doRequest(ctx, http.MethodPost, path, map[string]any{}, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

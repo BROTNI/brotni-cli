@@ -239,7 +239,61 @@ var (
 	addArtifactDigest string
 	addArtifactKind   string
 	addDiscoveredVia  string
+	addCommand        string
+	addMetricsPath    string
+	addRunTimeout     int
 )
+
+var campaignRunCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Execute a campaign's candidates and report the decision",
+	Long: `Execute every candidate that has an execution spec, collect the metrics each
+candidate emits, and report the resulting decision.
+
+This requires the studio's command runner to be enabled
+(BROTNI_ENABLE_COMMAND_RUNNER=1), which runs candidate commands on the studio
+host — a local/trusted-development affordance.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if campaignID == "" {
+			return fmt.Errorf("--id is required")
+		}
+		if cfg.DryRun {
+			fmt.Printf("[dry-run] would run campaign %s\n", campaignID)
+			return nil
+		}
+		client := api.NewClient(cfg.APIURL, cfg.Token, cfg.Debug)
+		report, err := client.RunCampaign(context.Background(), campaignID)
+		if err != nil {
+			return fmt.Errorf("running campaign: %w", err)
+		}
+		if cfg.Output == "json" {
+			return printer.PrintJSON(report)
+		}
+		fmt.Printf("Run report (campaign %s)\n", report.CampaignID)
+		for _, r := range report.Runs {
+			detail := ""
+			if r.Error != "" {
+				detail = " — " + r.Error
+			}
+			fmt.Printf("  %-22s %-10s %d metric(s)%s\n", r.CandidateName, r.Status, r.MetricCount, detail)
+		}
+		d := report.Decision
+		fmt.Println("Decision:")
+		if d.WinnerCandidateID != "" {
+			fmt.Printf("  Winner: %s\n", d.WinnerCandidateID)
+		} else {
+			fmt.Println("  Winner: none")
+		}
+		for _, rk := range d.Ranking {
+			block := "pass"
+			if !rk.PassedBlocking {
+				block = "FAIL"
+			}
+			fmt.Printf("    %d. %-22s %6.2f  [%s]\n", rk.Rank, rk.CandidateID, rk.OverallScore, block)
+		}
+		return nil
+	},
+}
 
 var campaignAddCandidateCmd = &cobra.Command{
 	Use:   "add-candidate",
@@ -275,6 +329,15 @@ updates the existing candidate instead of creating a duplicate.`,
 		}
 		if addArtifactURI != "" || addArtifactDigest != "" {
 			req.ArtifactRef = &api.ArtifactRef{Kind: addArtifactKind, URI: addArtifactURI, Digest: addArtifactDigest}
+		}
+		if addCommand != "" {
+			// Convenience: the command string is run via `sh -c`. This is a
+			// local/trusted-dev affordance consumed by `campaign run`.
+			req.Execution = &api.ExecutionSpec{
+				Command:        []string{"sh", "-c", addCommand},
+				MetricsPath:    addMetricsPath,
+				TimeoutSeconds: addRunTimeout,
+			}
 		}
 		if req.SourceKind == "" {
 			if req.ArtifactRef != nil {
@@ -343,8 +406,11 @@ func init() {
 	campaignCmd.AddCommand(campaignAddCandidateCmd)
 	campaignCmd.AddCommand(campaignStatusCmd)
 	campaignCmd.AddCommand(campaignIngestCmd)
+	campaignCmd.AddCommand(campaignRunCmd)
 	campaignCmd.AddCommand(campaignCompareCmd)
 	campaignCmd.AddCommand(campaignDecisionCmd)
+
+	campaignRunCmd.Flags().StringVar(&campaignID, "id", "", "campaign ID (required)")
 
 	campaignCreateCmd.Flags().StringVar(&campaignManifest, "manifest", "", "path to campaign manifest, e.g. .brotni/simulation.yaml (required)")
 
@@ -369,6 +435,9 @@ func init() {
 	af.StringVar(&addArtifactDigest, "artifact-digest", "", "artifact digest, e.g. sha256:...")
 	af.StringVar(&addArtifactKind, "artifact-kind", "oci-image", "artifact kind")
 	af.StringVar(&addDiscoveredVia, "discovered-via", "cli", "how the candidate was discovered: cli, label, manifest")
+	af.StringVar(&addCommand, "command", "", "shell command this candidate runs to emit metrics (writes JSON to $BROTNI_METRICS_PATH); enables `campaign run`")
+	af.StringVar(&addMetricsPath, "metrics-path", "", "explicit path the command writes JSON metrics to (defaults to $BROTNI_METRICS_PATH)")
+	af.IntVar(&addRunTimeout, "run-timeout", 0, "max seconds for the candidate run (0 = default 60s)")
 
 	campaignStatusCmd.Flags().StringVar(&campaignID, "id", "", "campaign ID (required)")
 
