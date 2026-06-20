@@ -226,7 +226,83 @@ var campaignDecisionCmd = &cobra.Command{
 var (
 	ingestCandidateID string
 	ingestMetrics     string
+
+	addName       string
+	addSourceKind string
+	addRecipe     string
+	addProvider   string
+	addRepo       string
+	addCommit     string
+	addBranch     string
+	addPR         string
+	addArtifactURI    string
+	addArtifactDigest string
+	addArtifactKind   string
+	addDiscoveredVia  string
 )
+
+var campaignAddCandidateCmd = &cobra.Command{
+	Use:   "add-candidate",
+	Short: "Register a single candidate with an existing campaign",
+	Long: `Register one change candidate (a PR/MR, OCI image, or config bundle) with an
+existing campaign. Used by CI integrations to submit the current build.
+
+Registration is idempotent by candidate name: re-running for the same name
+updates the existing candidate instead of creating a duplicate.`,
+	Example: `  brotni campaign add-candidate --id camp-123 --name pr-501 \
+    --source-kind container_image --provider github --repo owner/repo \
+    --commit "$GITHUB_SHA" --artifact-uri ghcr.io/owner/repo \
+    --artifact-digest sha256:...`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if campaignID == "" {
+			return fmt.Errorf("--id (campaign) is required")
+		}
+		if addName == "" {
+			return fmt.Errorf("--name is required")
+		}
+		req := api.ChangeCandidateRequest{
+			Name:          addName,
+			SourceKind:    addSourceKind,
+			RecipeRef:     addRecipe,
+			DiscoveredVia: addDiscoveredVia,
+			SourceRef: api.SourceRef{
+				Provider:        addProvider,
+				Repository:      addRepo,
+				ChangeRequestID: addPR,
+				Branch:          addBranch,
+				HeadSHA:         addCommit,
+			},
+		}
+		if addArtifactURI != "" || addArtifactDigest != "" {
+			req.ArtifactRef = &api.ArtifactRef{Kind: addArtifactKind, URI: addArtifactURI, Digest: addArtifactDigest}
+		}
+		if req.SourceKind == "" {
+			if req.ArtifactRef != nil {
+				req.SourceKind = "container_image"
+			} else {
+				req.SourceKind = "git_change"
+			}
+		}
+		if cfg.DryRun {
+			fmt.Printf("[dry-run] would register candidate %q (%s) with campaign %s\n", addName, req.SourceKind, campaignID)
+			return nil
+		}
+		client := api.NewClient(cfg.APIURL, cfg.Token, cfg.Debug)
+		resp, err := client.AddCandidate(context.Background(), campaignID, req)
+		if err != nil {
+			return fmt.Errorf("registering candidate: %w", err)
+		}
+		if cfg.Output == "json" {
+			return printer.PrintJSON(resp)
+		}
+		fmt.Println("Candidate registered")
+		fmt.Printf("  Campaign:  %s\n", campaignID)
+		fmt.Printf("  Candidate: %s\n", resp.ID)
+		fmt.Printf("  Name:      %s\n", resp.Name)
+		fmt.Printf("  Status:    %s\n", resp.Status)
+		return nil
+	},
+}
 
 var campaignIngestCmd = &cobra.Command{
 	Use:   "ingest",
@@ -264,6 +340,7 @@ simulation runs against the context, not hand-fed via the CLI.`,
 func init() {
 	campaignCmd.AddCommand(campaignCreateCmd)
 	campaignCmd.AddCommand(campaignDiscoverCmd)
+	campaignCmd.AddCommand(campaignAddCandidateCmd)
 	campaignCmd.AddCommand(campaignStatusCmd)
 	campaignCmd.AddCommand(campaignIngestCmd)
 	campaignCmd.AddCommand(campaignCompareCmd)
@@ -277,6 +354,21 @@ func init() {
 	campaignIngestCmd.Flags().StringVar(&campaignID, "id", "", "campaign ID (required)")
 	campaignIngestCmd.Flags().StringVar(&ingestCandidateID, "candidate", "", "candidate ID (required)")
 	campaignIngestCmd.Flags().StringVar(&ingestMetrics, "metrics", "", "comma-separated metric=value pairs (required)")
+
+	af := campaignAddCandidateCmd.Flags()
+	af.StringVar(&campaignID, "id", "", "campaign ID (required)")
+	af.StringVar(&addName, "name", "", "candidate name — stable key for idempotent re-registration, e.g. pr-501 (required)")
+	af.StringVar(&addSourceKind, "source-kind", "", "git_change, container_image, or config_bundle (inferred when empty)")
+	af.StringVar(&addRecipe, "recipe", "", "recipe reference for this candidate")
+	af.StringVar(&addProvider, "provider", "", "source provider: github, gitlab, ...")
+	af.StringVar(&addRepo, "repo", "", "repository in owner/name format")
+	af.StringVar(&addCommit, "commit", "", "head commit SHA")
+	af.StringVar(&addBranch, "branch", "", "source branch")
+	af.StringVar(&addPR, "pr", "", "pull/merge request ID")
+	af.StringVar(&addArtifactURI, "artifact-uri", "", "artifact URI, e.g. ghcr.io/org/image")
+	af.StringVar(&addArtifactDigest, "artifact-digest", "", "artifact digest, e.g. sha256:...")
+	af.StringVar(&addArtifactKind, "artifact-kind", "oci-image", "artifact kind")
+	af.StringVar(&addDiscoveredVia, "discovered-via", "cli", "how the candidate was discovered: cli, label, manifest")
 
 	campaignStatusCmd.Flags().StringVar(&campaignID, "id", "", "campaign ID (required)")
 
