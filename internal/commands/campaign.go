@@ -330,6 +330,16 @@ updates the existing candidate instead of creating a duplicate.`,
 		if addArtifactURI != "" || addArtifactDigest != "" {
 			req.ArtifactRef = &api.ArtifactRef{Kind: addArtifactKind, URI: addArtifactURI, Digest: addArtifactDigest}
 		}
+		// When --recipe points to a readable file, ship its content so the studio
+		// can resolve it into an execution at run time. The path is also kept as
+		// recipeRef for traceability.
+		if addRecipe != "" {
+			if data, err := os.ReadFile(addRecipe); err == nil {
+				req.Recipe = string(data)
+			} else {
+				output.PrintDebug(cfg.Debug, "recipe %q not read as a file (%v); sending as reference only", addRecipe, err)
+			}
+		}
 		if addCommand != "" {
 			// Convenience: the command string is run via `sh -c`. This is a
 			// local/trusted-dev affordance consumed by `campaign run`.

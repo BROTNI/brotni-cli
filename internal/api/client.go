@@ -148,6 +148,7 @@ type ChangeCandidateRequest struct {
 	RecipeRef     string         `json:"recipeRef,omitempty"`
 	DiscoveredVia string         `json:"discoveredVia,omitempty"`
 	Execution     *ExecutionSpec `json:"execution,omitempty"`
+	Recipe        string         `json:"recipe,omitempty"`
 }
 
 type RunOutcome struct {
